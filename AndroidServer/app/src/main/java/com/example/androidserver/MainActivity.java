@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     EditText etMessage;
     Button btnSend;
     public static String SERVER_IP = "";
-    public static final int SERVER_PORT = 8080;
+    public static final int SERVER_PORT = 9001;
     String message;
 
     @Override
@@ -43,13 +43,18 @@ public class MainActivity extends AppCompatActivity {
         tvMessages = findViewById(R.id.tvMessages);
         etMessage = findViewById(R.id.etMessage);
         btnSend = findViewById(R.id.btnSend);
+
         try {
             SERVER_IP = getLocalIpAddress();
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
+
+        //SERVER_IP =  "192.168.0.110";
+
         Thread1 = new Thread(new Thread1());
         Thread1.start();
+
         btnSend.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -60,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
     private String getLocalIpAddress() throws UnknownHostException {
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
         assert wifiManager != null;
@@ -67,8 +73,9 @@ public class MainActivity extends AppCompatActivity {
         int ipInt = wifiInfo.getIpAddress();
         return InetAddress.getByAddress(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(ipInt).array()).getHostAddress();
     }
-    private PrintWriter output;
-    private BufferedReader input;
+
+    private PrintWriter global_output_stream;
+
     class Thread1 implements Runnable {
         @Override
         public void run() {
@@ -83,49 +90,86 @@ public class MainActivity extends AppCompatActivity {
                         tvPort.setText("Port: " + String.valueOf(SERVER_PORT));
                     }
                 });
-                try {
-                    socket = serverSocket.accept();
-                    output = new PrintWriter(socket.getOutputStream());
-                    input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            tvMessages.setText("Connected\n");
+
+                while (true) {
+                    try {
+                        socket = serverSocket.accept();
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tvMessages.setText("Connected\n");
+                            }
+                        });
+
+                        new Thread(new Thread2(socket)).start();
+                    }
+                    //while (true) {
+                            /*output.println();
+                            final String message = input.readLine();
+                            if (message != null) {
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        tvMessages.append("client:" + message + "\n");
+                                    }
+                                });
+                            }*/
+                    //}
+                    catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private class Thread2 implements Runnable {
+        private Socket socket;
+        private PrintWriter output;
+        private BufferedReader input;
+
+        public Thread2(Socket socket) {
+            this.socket = socket;
+        }
+
+        @Override
+        public void run() {
+            try {
+                output = new PrintWriter(socket.getOutputStream());
+                global_output_stream = output;
+                input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+                output.println("Hi from Server");
+                while (true) {
+                    try {
+                        final String message = input.readLine();
+                        if (message != null) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    tvMessages.append("client:" + message + "\n");
+                                }
+                            });
                         }
-                    });
-                    new Thread(new Thread2()).start();
-                } catch (IOException e) {
-                    e.printStackTrace();
+                    /*else {
+                        Thread1 = new Thread(new Thread1());
+                        Thread1.start();
+                        return;
+                    }*/
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
-    private class Thread2 implements Runnable {
-        @Override
-        public void run() {
-            while (true) {
-                try {
-                    final String message = input.readLine();
-                    if (message != null) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                tvMessages.append("client:" + message + "\n");
-                            }
-                        });
-                    } else {
-                        Thread1 = new Thread(new Thread1());
-                        Thread1.start();
-                        return;
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
+
     class Thread3 implements Runnable {
         private String message;
         Thread3(String message) {
@@ -133,8 +177,8 @@ public class MainActivity extends AppCompatActivity {
         }
         @Override
         public void run() {
-            output.write(message);
-            output.flush();
+            global_output_stream.println(message);
+            global_output_stream.flush();
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
