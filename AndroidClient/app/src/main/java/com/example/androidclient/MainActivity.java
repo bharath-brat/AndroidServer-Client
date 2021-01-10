@@ -16,13 +16,15 @@ import android.os.Bundle;
 
 @SuppressLint("SetTextI18n")
 public class MainActivity extends AppCompatActivity {
-    Thread Thread1 = null;
     EditText etIP, etPort;
     TextView tvMessages;
     EditText etMessage;
     Button btnSend;
     String SERVER_IP;
     int SERVER_PORT;
+    MainActivity mainActivityInstance = this;
+    SocketOutputStreamWriter socketOutputStreamWriter = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,8 +42,9 @@ public class MainActivity extends AppCompatActivity {
                 tvMessages.setText("");
                 SERVER_IP = etIP.getText().toString().trim();
                 SERVER_PORT = Integer.parseInt(etPort.getText().toString().trim());
-                Thread1 = new Thread(new Thread1());
-                Thread1.start();
+
+                ClientManagerThread clientManager = new ClientManagerThread(mainActivityInstance, SERVER_IP, SERVER_PORT);
+                new Thread(clientManager).start();
             }
         });
 
@@ -50,13 +53,51 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 String message = etMessage.getText().toString().trim();
                 if (!message.isEmpty()) {
-                    new Thread(new Thread3(message)).start();
+                    //Flush the message from the client to the server
+                    socketOutputStreamWriter.setMessage(message);
+                    new Thread(socketOutputStreamWriter).start();
                 }
             }
         });
     }
 
-    private PrintWriter global_output_stream;
+    public void setSocketOutputStreamWriter() {
+        socketOutputStreamWriter = new SocketOutputStreamWriter(this);
+    }
+
+    public void setOutputStreamForOutputStreamWriter(PrintWriter output){
+        socketOutputStreamWriter.setOutputStream(output);
+    }
+
+    public void printClientStatusInUIThread(String status){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvMessages.setText(status);
+            }
+        });
+    }
+
+    public void printMessageInUIThread(String message){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvMessages.append(message);
+            }
+        });
+    }
+
+    public void printMessageFromClientInUIThread(String message){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvMessages.append(message);
+                etMessage.setText("");
+            }
+        });
+    }
+
+    /*private PrintWriter global_output_stream;
 
     class Thread1 implements Runnable {
         @Override
@@ -107,11 +148,11 @@ public class MainActivity extends AppCompatActivity {
                                     tvMessages.append("server: " + message + "\n");
                                 }
                             });
-                        } /*else {
+                        } *//*else {
                         Thread1 = new Thread(new Thread1());
                         Thread1.start();
                         return;
-                    }*/
+                    }*//*
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -139,5 +180,5 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
-    }
+    }*/
 }

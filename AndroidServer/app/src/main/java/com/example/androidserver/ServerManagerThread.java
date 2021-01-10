@@ -38,7 +38,7 @@ public class ServerManagerThread implements Runnable {
                 socket = serverSocket.accept();
                 mainActivity.printServerStatusInUIThread(serverIP, serverPort, "Connected\n");
 
-                //After successfully connecting to the client, start reading the input stream from the server
+                //After successfully connecting to the client, start reading the input stream from the client
                 new Thread(new SocketInputStreamReader(mainActivity, socket)).start();
             }
         } catch (IOException e) {
