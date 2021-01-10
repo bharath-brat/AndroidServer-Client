@@ -24,8 +24,6 @@ import android.os.Bundle;
 
 @SuppressLint("SetTextI18n")
 public class MainActivity extends AppCompatActivity {
-    ServerSocket serverSocket;
-    Thread Thread1 = null;
     TextView tvIP, tvPort;
     TextView tvMessages;
     EditText etMessage;
@@ -33,6 +31,7 @@ public class MainActivity extends AppCompatActivity {
     public static String SERVER_IP = "";
     public static final int SERVER_PORT = 9001;
     String message;
+    SocketOutputStreamWriter socketOutputStreamWriter = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,147 +44,69 @@ public class MainActivity extends AppCompatActivity {
         btnSend = findViewById(R.id.btnSend);
 
         try {
-            SERVER_IP = getLocalIpAddress();
-        } catch (UnknownHostException e) {
+            GetWifiInfo wifiInfo = new GetWifiInfo((WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE));
+            //Get the IP address of the Wifi
+            SERVER_IP = wifiInfo.getLocalIpAddress();
+
+            //Start the server on localhost:9001
+            ServerManagerThread serverManager = new ServerManagerThread(this, SERVER_IP, SERVER_PORT);
+            new Thread(serverManager).start();
+
+        } catch (UnknownHostException e){
+            e.printStackTrace();
+        }catch (Exception e){
             e.printStackTrace();
         }
 
-        //SERVER_IP =  "192.168.0.110";
-
-        Thread1 = new Thread(new Thread1());
-        Thread1.start();
-
+        //Listen to the server side message when Clicked "Send"
         btnSend.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 message = etMessage.getText().toString().trim();
                 if (!message.isEmpty()) {
-                    new Thread(new Thread3(message)).start();
+                    //Flush the message from the server to the client
+                    socketOutputStreamWriter.setMessage(message);
+                    new Thread(socketOutputStreamWriter).start();
                 }
             }
         });
     }
 
-    private String getLocalIpAddress() throws UnknownHostException {
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-        assert wifiManager != null;
-        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-        int ipInt = wifiInfo.getIpAddress();
-        return InetAddress.getByAddress(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(ipInt).array()).getHostAddress();
+    public void setSocketOutputStreamWriter() {
+        socketOutputStreamWriter = new SocketOutputStreamWriter(this);
     }
 
-    private PrintWriter global_output_stream;
+    public void setOutputStreamForOutputStreamWriter(PrintWriter output){
+        socketOutputStreamWriter.setOutputStream(output);
+    }
 
-    class Thread1 implements Runnable {
-        @Override
-        public void run() {
-            Socket socket;
-            try {
-                serverSocket = new ServerSocket(SERVER_PORT);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        tvMessages.setText("Not connected");
-                        tvIP.setText("IP: " + SERVER_IP);
-                        tvPort.setText("Port: " + String.valueOf(SERVER_PORT));
-                    }
-                });
-
-                while (true) {
-                    try {
-                        socket = serverSocket.accept();
-
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                tvMessages.setText("Connected\n");
-                            }
-                        });
-
-                        new Thread(new Thread2(socket)).start();
-                    }
-                    //while (true) {
-                            /*output.println();
-                            final String message = input.readLine();
-                            if (message != null) {
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        tvMessages.append("client:" + message + "\n");
-                                    }
-                                });
-                            }*/
-                    //}
-                    catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-            } catch (IOException e) {
-                e.printStackTrace();
+    public void printServerStatusInUIThread(String serverIP, int serverPort, String status){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvIP.setText("IP: " + serverIP);
+                tvPort.setText("Port: " + String.valueOf(serverPort));
+                tvMessages.setText(status);
             }
-        }
+        });
     }
 
-    private class Thread2 implements Runnable {
-        private Socket socket;
-        private PrintWriter output;
-        private BufferedReader input;
-
-        public Thread2(Socket socket) {
-            this.socket = socket;
-        }
-
-        @Override
-        public void run() {
-            try {
-                output = new PrintWriter(socket.getOutputStream());
-                global_output_stream = output;
-                input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                output.println("Hi from Server");
-                while (true) {
-                    try {
-                        final String message = input.readLine();
-                        if (message != null) {
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    tvMessages.append("client:" + message + "\n");
-                                }
-                            });
-                        }
-                    /*else {
-                        Thread1 = new Thread(new Thread1());
-                        Thread1.start();
-                        return;
-                    }*/
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+    public void printMessageInUIThread(String message){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvMessages.append(message);
             }
-        }
+        });
     }
 
-    class Thread3 implements Runnable {
-        private String message;
-        Thread3(String message) {
-            this.message = message;
-        }
-        @Override
-        public void run() {
-            global_output_stream.println(message);
-            global_output_stream.flush();
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    tvMessages.append("server: " + message + "\n");
-                    etMessage.setText("");
-                }
-            });
-        }
+    public void printMessageFromServerInUIThread(String message){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvMessages.append(message);
+                etMessage.setText("");
+            }
+        });
     }
 }
