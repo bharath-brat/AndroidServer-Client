@@ -1,5 +1,8 @@
 package com.example.androidserver;
 
+import android.media.MediaPlayer;
+import android.provider.Settings;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -33,6 +36,7 @@ public class SocketInputStreamReader implements Runnable {
                 final String message = input.readLine();
                 if (message != null) {
                     mainActivity.printMessageInUIThread("client:" + message + "\n");
+                    mainActivity.startDefaultRingtone();
                 }
             }
         } catch (IOException e) {

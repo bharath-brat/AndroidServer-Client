@@ -1,26 +1,23 @@
 package com.example.androidserver;
 import android.annotation.SuppressLint;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
+import android.app.ActivityManager;
+import android.content.Context;
+import android.content.Intent;
+import android.media.MediaPlayer;
+import android.os.Build;
 import android.os.Bundle;
 // import android.support.v7.app.AppCompatActivity;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import androidx.appcompat.app.AppCompatActivity;
 
-import android.os.Bundle;
+import java.io.PrintWriter;
+
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
 
 @SuppressLint("SetTextI18n")
 public class MainActivity extends AppCompatActivity {
@@ -28,11 +25,12 @@ public class MainActivity extends AppCompatActivity {
     TextView tvMessages;
     EditText etMessage;
     Button btnSend;
-    public static String SERVER_IP = "";
-    public static final int SERVER_PORT = 9001;
     String message;
     SocketOutputStreamWriter socketOutputStreamWriter = null;
+    MyService myService;
+    Intent intent;
 
+    @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,19 +41,15 @@ public class MainActivity extends AppCompatActivity {
         etMessage = findViewById(R.id.etMessage);
         btnSend = findViewById(R.id.btnSend);
 
-        try {
-            GetWifiInfo wifiInfo = new GetWifiInfo((WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE));
-            //Get the IP address of the Wifi
-            SERVER_IP = wifiInfo.getLocalIpAddress();
+        //Information Holder, which hold global information
+        SingletonInformationHolder informationHolder = SingletonInformationHolder.getInstance();
+        informationHolder.setMainActivity(this);
 
-            //Start the server on localhost:9001
-            ServerManagerThread serverManager = new ServerManagerThread(this, SERVER_IP, SERVER_PORT);
-            new Thread(serverManager).start();
-
-        } catch (UnknownHostException e){
-            e.printStackTrace();
-        }catch (Exception e){
-            e.printStackTrace();
+        //Starting the server in the service, so server will be always running in the background
+        myService = new MyService();
+        intent = new Intent(this, myService.getClass());
+        if (!isMyServiceRunning(myService.getClass())) {
+            startService(intent);
         }
 
         //Listen to the server side message when Clicked "Send"
@@ -70,6 +64,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private boolean isMyServiceRunning(Class serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                Log.i ("Service status", "Running");
+                return true;
+            }
+        }
+        Log.i ("Service status", "Not running");
+        return false;
     }
 
     public void setSocketOutputStreamWriter() {
@@ -108,5 +114,19 @@ public class MainActivity extends AppCompatActivity {
                 etMessage.setText("");
             }
         });
+    }
+
+    public void startDefaultRingtone(){
+        //getting systems default ringtone
+        MediaPlayer player;
+        player = MediaPlayer.create(this,
+                Settings.System.DEFAULT_RINGTONE_URI);
+
+        //setting loop play to true
+        //this will make the ringtone continuously playing
+        player.setLooping(false);
+
+        //staring the player
+        player.start();
     }
 }
